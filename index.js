@@ -1,9 +1,50 @@
 "use strict";
 
 // const axios = require('axios');
+// const sessionStorage = require('sessionstorage')
+
+const { Dexie } = require('dexie');
 const { addQuery, createUrl } = require('dumb-url-handler');
 const HostUrl = 'http://nyan';
 const EndPointUrl = createUrl(HostUrl, ['/api/hongya']);
+
+const setupDexie = () => {
+  const setGlobalVars = require('indexeddbshim');
+  const thing = {};
+  setGlobalVars(thing, {checkOrigin: false});
+  const { indexedDB, IDBKeyRange } = thing;
+  
+  return new Dexie('MyDatabase', {
+    indexedDB: indexedDB,
+    IDBKeyRange: IDBKeyRange
+  })
+};
+
+const db = setupDexie();
+db.version(1).stores({
+  friends: '++id, name, age'
+});
+
+(async () => {
+  // or make a new one
+  await db.friends.add({
+    name: 'Camilla',
+    age: 25,
+  });
+
+  const friend = await db.friends
+          .where('age')
+          .above(15)
+          .toArray();
+  
+  console.log(friend);
+})().then((ret) => {})
+    .catch((err) => {
+      console.error(err);
+    })
+
+
+
 
 const axios = {
   get(url) {
@@ -19,14 +60,23 @@ const axios = {
   }
 }
 
-async function main(seed, n) {
+function main(seed, n) {
   const handler = new RecursiveHandler();
+  handler.recursive(seed, n)
+    .then((ret) => {
+      console.log(ret)
+    })
+    .catch((error) => {
+      console.log(error)
+    })
+}
 
-  try {
-    const ret = await handler.recursive(seed, n);
-    console.log(ret);
-  } catch(error) {
-  }
+let requestStack = {};
+const setStorage = (key, value) => {
+  requestStack[key] = value;
+}
+const getStorage = (key) => {
+  requestStack[key];
 }
 
 class RecursiveHandler {
@@ -52,7 +102,8 @@ class RecursiveHandler {
           return stack;
         }, 0);
       } else {
-        const cache = sessionStorage.getItem(inputN);
+        const cache = getStorage(inputN);
+        // console.log(cache);
         if (cache == null) {
           const ret = await axios.get(addQuery(EndPointUrl, {
             seed: inputSeed,
@@ -61,7 +112,7 @@ class RecursiveHandler {
           const { seed, result, n } = ret.data;
           this.requestStack[inputN] = result;
 
-          sessionStorage.setItem(inputN, result);
+          setStorage(inputN, result);
 
           return result;
         } else {
@@ -73,6 +124,8 @@ class RecursiveHandler {
     }
   }
 }
+
+setStorage(2, 22);
 
 main(
   'hoge',
